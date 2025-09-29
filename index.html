@@ -22,7 +22,7 @@
         .product-filter-btn { padding: 0.5rem 1.5rem; border-radius: 9999px; font-weight: 500; transition: all 0.2s ease-in-out; background-color: #eef2ff; color: #4338ca; }
         .product-filter-btn:hover { background-color: #e0e7ff; }
         .testimonial-card { background: #ffffff; border: 1px solid #e2e8f0; }
-        .modal-open { backdrop-filter: blur(5px); }
+        .modal-open { overflow: hidden; backdrop-filter: blur(5px); }
         /* Styles for selected variant */
         .variant-option input:checked + label { border-color: #4f46e5; background-color: #eef2ff; box-shadow: 0 0 0 2px #c7d2fe; }
         /* Styles for QR code tabs */
@@ -33,6 +33,7 @@
 </head>
 <body class="text-gray-800">
 
+    <!-- Header -->
     <header class="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-40">
         <div class="container mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16">
@@ -75,6 +76,7 @@
         </div>
     </header>
 
+    <!-- Mobile Menu -->
     <div id="mobile-menu-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden"></div>
     <aside id="sidebar" class="bg-slate-800 text-white w-72 space-y-6 py-7 px-2 fixed top-0 left-0 h-full transform -translate-x-full transition-transform duration-300 ease-in-out z-50 flex flex-col">
          <div class="h-16 flex items-center justify-between px-4">
@@ -82,14 +84,17 @@
              <button data-action="close-mobile-menu" class="md:hidden text-3xl font-light text-gray-300 hover:text-white">&times;</button>
         </div>
         <nav id="mobile-nav-content" class="flex-1 px-4 space-y-4 flex flex-col">
-            </nav>
+            <!-- Mobile nav content injected here -->
+        </nav>
     </aside>
 
+    <!-- Main Content -->
     <main>
         <section id="hero-section" class="hero-bg relative">
              <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-32 text-center">
                  <div id="hero-content-wrapper" class="relative z-10">
-                     </div>
+                     <!-- Hero content injected by JS -->
+                 </div>
             </div>
         </section>
 
@@ -140,8 +145,10 @@
         </div>
     </footer>
 
-    <div id="login-modal" class="modal hidden fixed z-50 inset-0 bg-gray-600 bg-opacity-75 opacity-0"></div>
-    <div id="signup-modal" class="modal hidden fixed z-50 inset-0 bg-gray-600 bg-opacity-75 opacity-0"></div>
+    <!-- Modals -->
+    <div id="login-modal" class="modal hidden fixed z-[60] inset-0 bg-gray-600 bg-opacity-75 opacity-0"></div>
+    <div id="signup-modal" class="modal hidden fixed z-[60] inset-0 bg-gray-600 bg-opacity-75 opacity-0"></div>
+    <div id="forgot-password-modal" class="modal hidden fixed z-[60] inset-0 bg-gray-600 bg-opacity-75 opacity-0"></div>
     <div id="cart-modal" class="modal hidden fixed z-50 inset-0 bg-gray-600 bg-opacity-75 opacity-0"></div>
     <div id="orders-modal" class="modal hidden fixed z-50 inset-0 bg-gray-600 bg-opacity-75 opacity-0"></div>
     <div id="wallet-modal" class="modal hidden fixed z-50 inset-0 bg-gray-600 bg-opacity-75 opacity-0"></div>
@@ -156,7 +163,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getFirestore, collection, onSnapshot, doc, getDoc, setDoc, updateDoc, addDoc, serverTimestamp, query, where, getDocs, orderBy, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
         
         const firebaseConfig = {
             apiKey: "AIzaSyBiUtsMIbjJuoAkgi2_2gMw1872FD1XQpw",
@@ -171,7 +178,7 @@
         const auth = getAuth(app);
         
         let allProducts = [];
-        let paymentQRs = []; // NEW: To store payment QR codes
+        let paymentQRs = [];
         let cart = [];
         let allCoupons = new Map();
         let appliedCoupon = null;
@@ -220,7 +227,7 @@
             loadReviews();
             loadBannerContent();
             loadCoupons();
-            loadPaymentQRs(); // NEW: Load QR codes
+            loadPaymentQRs();
         }
 
         function initEventListeners() {
@@ -232,10 +239,11 @@
             const modals = {
                 'login-modal': createLoginModalHTML(),
                 'signup-modal': createSignupModalHTML(),
+                'forgot-password-modal': createForgotPasswordModalHTML(),
                 'cart-modal': createCartModalHTML(),
                 'orders-modal': createOrdersModalHTML(),
                 'wallet-modal': createWalletModalHTML(),
-                'payment-modal': createPaymentModalHTML(), // This will be dynamic now
+                'payment-modal': createPaymentModalHTML(),
                 'product-detail-modal': `<div class="flex items-center justify-center min-h-screen p-4"><div id="product-detail-content" class="modal-content bg-white rounded-lg shadow-xl w-full max-w-4xl m-4 relative"></div></div>`,
                 'phone-number-modal': createPhoneModalHTML()
             };
@@ -248,6 +256,7 @@
 
             document.getElementById('login-form')?.addEventListener('submit', handleLoginFormSubmit);
             document.getElementById('signup-form')?.addEventListener('submit', handleSignupFormSubmit);
+            document.getElementById('forgot-password-form')?.addEventListener('submit', handleForgotPasswordFormSubmit);
             document.getElementById('phone-number-form')?.addEventListener('submit', processOrder);
         }
         
@@ -272,6 +281,14 @@
                 const actionMap = {
                     'open-login': () => openModal(document.getElementById('login-modal')),
                     'open-signup': () => openModal(document.getElementById('signup-modal')),
+                    'open-forgot-password': () => {
+                        closeModal(document.getElementById('login-modal'));
+                        openModal(document.getElementById('forgot-password-modal'));
+                    },
+                    'switch-to-signup': () => {
+                        closeModal(document.getElementById('login-modal'));
+                        openModal(document.getElementById('signup-modal'));
+                    },
                     'open-wallet': () => { fetchAndShowWalletHistory(); openModal(document.getElementById('wallet-modal')); },
                     'open-orders': () => { fetchAndShowOrders(); openModal(document.getElementById('orders-modal')); },
                     'open-cart': () => openModal(document.getElementById('cart-modal')),
@@ -456,7 +473,6 @@
             if(modalWallet) modalWallet.textContent = formattedBalance;
         }
 
-        // MODIFIED: renderProducts now supports variants
         function renderProducts(container, productsToRender) {
             if (!container) return;
             container.innerHTML = productsToRender.map(product => {
@@ -494,7 +510,6 @@
             container.innerHTML = reviews.map(t => `<div class="testimonial-card rounded-lg p-6 flex flex-col"><div class="flex items-center mb-2">${[...Array(5)].map((_, i) => `<i class="fas fa-star ${i < t.stars ? 'text-yellow-400' : 'text-gray-300'}"></i>`).join('')}</div><p class="text-gray-600 mb-4 flex-grow">"${t.text}"</p><p class="font-semibold text-gray-800 text-right">- ${t.name}</p></div>`).join(''); 
         }
 
-        // MODIFIED: addToCart now handles variants
         function addToCart(productId, selectedVariant) {
             const product = allProducts.find(p => p.id === productId);
             if (!product) return;
@@ -526,7 +541,6 @@
             renderCartItems();
         }
 
-        // MODIFIED: renderCartItems now handles variants
         function renderCartItems() {
             const container = document.getElementById('cart-items-container');
             if (!container) return; 
@@ -592,10 +606,8 @@
             snapshot.docs.forEach(doc => allCoupons.set(doc.data().code.toUpperCase(), doc.data()));
         }, err => console.error("Error loading coupons:", err));
         
-        // NEW: Load Payment QR codes
         const loadPaymentQRs = () => onSnapshot(collection(db, 'paymentQRs'), (snapshot) => {
             paymentQRs = snapshot.docs.map(doc => doc.data());
-            // Re-render the payment modal with the new QR data
             const paymentModal = document.getElementById('payment-modal');
             if (paymentModal) {
                 paymentModal.innerHTML = createPaymentModalHTML();
@@ -773,6 +785,32 @@
             } catch (error) { errorMsg.textContent = error.message; }
         }
 
+        async function handleForgotPasswordFormSubmit(e) {
+            e.preventDefault();
+            const email = e.target.querySelector('#forgot-email').value;
+            const errorMsg = e.target.querySelector('#forgot-error-msg');
+            const successMsg = e.target.querySelector('#forgot-success-msg');
+            errorMsg.textContent = '';
+            successMsg.textContent = '';
+
+            if (!email) {
+                errorMsg.textContent = 'Please enter your email address.';
+                return;
+            }
+            showLoader(true);
+            try {
+                await sendPasswordResetEmail(auth, email);
+                successMsg.textContent = 'Password reset link sent! Please check your email.';
+                setTimeout(() => {
+                    closeModal(document.getElementById('forgot-password-modal'));
+                }, 3000);
+            } catch (error) {
+                errorMsg.textContent = error.message;
+            } finally {
+                showLoader(false);
+            }
+        }
+
         async function handlePaymentFormSubmit(e) {
             e.preventDefault();
             if (!auth.currentUser) { showToast("You must be logged in.", true); return; }
@@ -806,13 +844,41 @@
             </div>`;
         }
         
-        function createLoginModalHTML() { return createModalHTML('login-modal', 'Login', 'login-form', `<div class="space-y-4"><div><label for="login-email" class="block text-sm font-medium text-gray-700">Email</label><input type="email" id="login-email" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-indigo-500 focus:border-indigo-500"></div><div><label for="login-password" class="block text-sm font-medium text-gray-700">Password</label><input type="password" id="login-password" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-indigo-500 focus:border-indigo-500"></div><p id="login-error-msg" class="text-sm text-red-600"></p></div>`, `<button type="submit" class="w-full mt-6 bg-indigo-600 text-white py-2 rounded-md hover:bg-indigo-700 font-semibold">Login</button>`); }
+        function createLoginModalHTML() { 
+            const content = `<div class="space-y-4"><div><label for="login-email" class="block text-sm font-medium text-gray-700">Email</label><input type="email" id="login-email" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-indigo-500 focus:border-indigo-500"></div><div><label for="login-password" class="block text-sm font-medium text-gray-700">Password</label><input type="password" id="login-password" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-indigo-500 focus:border-indigo-500"></div><p id="login-error-msg" class="text-sm text-red-600"></p></div>`;
+            const buttons = `<div class="mt-6">
+                                <button type="submit" class="w-full bg-indigo-600 text-white py-2 rounded-md hover:bg-indigo-700 font-semibold">Login</button>
+                                <div class="text-right mt-2">
+                                    <button type="button" data-action="open-forgot-password" class="text-sm font-medium text-indigo-600 hover:text-indigo-500">Forgot Password?</button>
+                                </div>
+                             </div>
+                             <div class="mt-4 text-center text-sm text-gray-600">
+                                Don't have an account? 
+                                <button type="button" data-action="switch-to-signup" class="font-medium text-indigo-600 hover:text-indigo-500">Sign Up</button>
+                             </div>`;
+            return createModalHTML('login-modal', 'Login', 'login-form', content, buttons); 
+        }
+
         function createSignupModalHTML() { return createModalHTML('signup-modal', 'Create Account', 'signup-form', `<div class="space-y-4"><div><label for="signup-email" class="block text-sm font-medium text-gray-700">Email</label><input type="email" id="signup-email" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-indigo-500 focus:border-indigo-500"></div><div><label for="signup-password" class="block text-sm font-medium text-gray-700">Password (min. 6 characters)</label><input type="password" id="signup-password" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-indigo-500 focus:border-indigo-500"></div><p id="signup-error-msg" class="text-sm text-red-600"></p></div>`, `<button type="submit" class="w-full mt-6 bg-indigo-600 text-white py-2 rounded-md hover:bg-indigo-700 font-semibold">Sign Up</button>`); }
+        
+        function createForgotPasswordModalHTML() { 
+            return createModalHTML('forgot-password-modal', 'Reset Password', 'forgot-password-form', 
+            `<p class="text-sm text-gray-600 mb-4">Enter your email address and we will send you a link to reset your password.</p>
+             <div class="space-y-4">
+                <div>
+                    <label for="forgot-email" class="block text-sm font-medium text-gray-700">Email</label>
+                    <input type="email" id="forgot-email" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <p id="forgot-error-msg" class="text-sm text-red-600"></p>
+                <p id="forgot-success-msg" class="text-sm text-green-600"></p>
+             </div>`, 
+            `<button type="submit" class="w-full mt-6 bg-indigo-600 text-white py-2 rounded-md hover:bg-indigo-700 font-semibold">Send Reset Link</button>`); 
+        }
+
         function createCartModalHTML() { return `<div class="flex items-center justify-center min-h-screen p-4"><div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-lg m-4"><div class="p-6"><div class="flex justify-between items-center mb-6"><h3 class="text-xl font-semibold text-gray-900">Your Cart</h3><button class="close-modal-btn text-gray-400 hover:text-gray-600 text-2xl" data-modal-id="cart-modal">&times;</button></div><div id="cart-items-container" class="max-h-96 overflow-y-auto pr-2 -mr-2"></div><div id="cart-empty-state" class="text-center py-12 hidden"><i class="fas fa-shopping-cart text-4xl text-gray-300 mb-4"></i><p class="text-gray-500">Your cart is empty.</p></div><div id="cart-summary" class="mt-6 border-t pt-4 hidden"><div class="flex items-center gap-2 mb-2"><input id="coupon-code" type="text" placeholder="Coupon Code" class="flex-grow border rounded-md p-2"><button data-action="apply-coupon" class="bg-gray-200 px-4 py-2 rounded-md font-semibold text-sm">Apply</button></div><div id="coupon-feedback"></div><div class="space-y-2 mt-4"><div class="flex justify-between"><span>Subtotal</span><span id="cart-subtotal">₹0.00</span></div><div class="flex justify-between text-sm text-green-600"><span>Discount</span><span id="cart-discount">- ₹0.00</span></div><div class="flex justify-between items-center text-lg font-semibold border-t pt-2 mt-2"><span>Total</span><span id="cart-total">₹0.00</span></div></div><button id="checkout-btn" data-action="checkout" class="w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 mt-4 font-bold disabled:bg-gray-400">Checkout</button></div></div></div></div>`; }
         function createOrdersModalHTML() { return `<div class="flex items-center justify-center min-h-screen p-4"><div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-2xl m-4"><div class="p-6"><div class="flex justify-between items-center mb-6"><h3 class="text-xl font-semibold text-gray-900">My Order History</h3><button class="close-modal-btn text-gray-400 hover:text-gray-600 text-2xl" data-modal-id="orders-modal">&times;</button></div><div id="orders-container" class="max-h-96 overflow-y-auto pr-2"></div><div id="orders-loader" class="text-center py-8 hidden"><i class="fas fa-spinner fa-spin text-2xl text-indigo-600"></i></div><div id="orders-empty-state" class="text-center py-12 hidden"><i class="fas fa-receipt text-4xl text-gray-300 mb-4"></i><p class="text-gray-500">You haven't placed any orders yet.</p></div></div></div></div>`; }
         function createWalletModalHTML() { return `<div class="flex items-center justify-center min-h-screen p-4"><div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-md m-4"><div class="p-6"><div class="flex justify-between items-center mb-4"><h3 class="text-xl font-semibold text-gray-900">My Wallet</h3><button class="close-modal-btn text-gray-400 hover:text-gray-600 text-2xl" data-modal-id="wallet-modal">&times;</button></div><div class="bg-indigo-600 text-white rounded-lg p-6 text-center mb-6"><p class="text-sm opacity-80">Current Balance</p><p id="wallet-modal-balance" class="text-4xl font-bold">₹0.00</p></div><button data-action="add-balance" class="w-full bg-green-500 text-white py-3 rounded-md hover:bg-green-600 font-bold mb-4">Add Balance</button><h4 class="font-semibold mb-2">Transaction History</h4><div id="wallet-history-container" class="max-h-60 overflow-y-auto border rounded-md p-2"></div><div id="wallet-history-loader" class="text-center py-4 hidden"><i class="fas fa-spinner fa-spin text-indigo-600"></i></div><div id="wallet-history-empty" class="text-center py-6 text-gray-500 hidden">No transactions yet.</div></div></div></div>`; }
         
-        // MODIFIED: createPaymentModalHTML now supports multiple QR codes
         function createPaymentModalHTML() {
             if (!paymentQRs || paymentQRs.length === 0) {
                 return `<div class="flex items-center justify-center min-h-screen p-4"><div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-sm m-4 p-6 text-center"><p class="text-gray-600">Payment options are currently unavailable. Please check back later.</p><button type="button" class="close-modal-btn mt-4 bg-gray-200 py-2 px-4 rounded-md">Close</button></div></div>`;
@@ -838,18 +904,15 @@
 
             const targetId = targetButton.dataset.target;
             
-            // Deactivate all tabs and content
             document.querySelectorAll('.qr-tab').forEach(tab => tab.classList.remove('active', 'border-indigo-500'));
             document.querySelectorAll('.qr-content').forEach(content => content.classList.remove('active'));
 
-            // Activate the clicked one
             targetButton.classList.add('active', 'border-indigo-500');
             document.getElementById(targetId).classList.add('active');
         }
 
         function createPhoneModalHTML() { return `<div class="flex items-center justify-center min-h-screen p-4"><div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-sm m-4"><form id="phone-number-form" class="p-6"><h3 class="text-xl font-semibold mb-4">Confirm Your Order</h3><p class="text-gray-600 mb-4">Please enter your WhatsApp phone number to receive order details.</p><div><label for="phone-number" class="block text-sm font-medium text-gray-700">Phone Number (e.g., 91...)</label><input type="tel" id="phone-number" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" required></div><div class="mt-6 flex justify-end space-x-3"><button type="button" class="bg-gray-200 py-2 px-4 rounded-md close-modal-btn" data-modal-id="phone-number-modal">Cancel</button><button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-md">Confirm Purchase</button></div></form></div></div>`; }
         
-        // MODIFIED: showProductDetail now supports variants
         function showProductDetail(productId) {
             const product = allProducts.find(p => p.id === productId);
             if (!product || !product.variants || product.variants.length === 0) {
@@ -898,7 +961,6 @@
                     </div>
                 </div>`;
             
-            // Add event listener to update price on variant change
             content.querySelector('#variant-selector').addEventListener('change', (e) => {
                 if(e.target.name === 'variant-option') {
                     const selectedVariant = JSON.parse(e.target.value);
@@ -911,3 +973,4 @@
     </script>
 </body>
 </html>
+
