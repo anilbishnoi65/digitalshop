@@ -23,12 +23,18 @@
         .product-filter-btn:hover { background-color: #e0e7ff; }
         .testimonial-card { background: #ffffff; border: 1px solid #e2e8f0; }
         .modal-open { overflow: hidden; }
-        /* Styles for selected variant */
         .variant-option input:checked + label { border-color: #4f46e5; background-color: #eef2ff; box-shadow: 0 0 0 2px #c7d2fe; }
-        /* Styles for QR code tabs */
         .qr-tab.active { background-color: #4f46e5; color: white; }
         .qr-content { display: none; }
         .qr-content.active { display: block; }
+        .key-code { 
+            background-color: #eef2ff; 
+            color: #4338ca; 
+            padding: 2px 6px; 
+            border-radius: 4px; 
+            font-family: monospace;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body class="text-gray-800">
@@ -162,7 +168,7 @@
     
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getFirestore, collection, onSnapshot, doc, getDoc, setDoc, updateDoc, addDoc, serverTimestamp, query, where, getDocs, orderBy, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, doc, getDoc, setDoc, updateDoc, addDoc, serverTimestamp, query, where, getDocs, orderBy, runTransaction, arrayRemove, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
         
         const firebaseConfig = {
@@ -270,6 +276,7 @@
             if (target.matches('.close-modal-btn')) closeModal(target.closest('.modal'));
             if (target.matches('.product-filter-btn')) handleFilterClick(e);
             if (target.matches('.qr-tab')) handleQrTabClick(e);
+            if (target.matches('.key-code')) copyToClipboard(target.textContent);
             
             const productCard = target.closest('.product-card');
             if (productCard) {
@@ -358,12 +365,6 @@
             e.preventDefault();
             if (!purchaseContext || !currentUserData) return;
 
-            const phoneNumber = document.getElementById('phone-number').value.trim();
-            if (!phoneNumber || !/^\d{10,}$/.test(phoneNumber)) {
-                showToast("Please enter a valid phone number.", true);
-                return;
-            }
-            
             closeModal(document.getElementById('phone-number-modal'));
             showLoader(true);
 
@@ -371,7 +372,6 @@
             const subtotal = items.reduce((sum, item) => sum + (item.selectedVariant.price * item.quantity), 0);
             const discountAmount = appliedCoupon && isFromCart ? calculateDiscount(subtotal, appliedCoupon) : 0;
             const totalCost = subtotal - discountAmount;
-            const orderId = `NGK-${Date.now()}`;
 
             if (currentUserData.walletBalance < totalCost) {
                 showToast("Insufficient wallet balance.", true);
@@ -381,41 +381,75 @@
 
             try {
                 const userDocRef = doc(db, 'users', currentUserData.uid);
+                const orderId = doc(collection(db, 'orders')).id; // Generate order ID upfront
+
+                const purchasedKeysByProduct = {};
+                
                 await runTransaction(db, async (transaction) => {
                     const userDoc = await transaction.get(userDocRef);
                     if (!userDoc.exists() || userDoc.data().walletBalance < totalCost) {
-                        throw new Error("Insufficient funds.");
+                        throw new Error("Insufficient funds. Please add balance to your wallet.");
                     }
+
+                    // 1. Process each item in the cart
+                    for (const item of items) {
+                        const productRef = doc(db, 'products', item.id);
+                        const productDoc = await transaction.get(productRef);
+                        if (!productDoc.exists()) {
+                            throw new Error(`Product "${item.name}" is no longer available.`);
+                        }
+                        const productData = productDoc.data();
+                        
+                        if (!productData.keys || productData.keys.length < item.quantity) {
+                            throw new Error(`Sorry, "${item.name}" is out of stock.`);
+                        }
+
+                        const keysToAssign = productData.keys.slice(0, item.quantity);
+                        purchasedKeysByProduct[item.id] = keysToAssign;
+
+                        // Remove the assigned keys from the product's stock
+                        transaction.update(productRef, { keys: arrayRemove(...keysToAssign) });
+                    }
+
+                    // 2. Update user's wallet
                     const newBalance = userDoc.data().walletBalance - totalCost;
                     transaction.update(userDocRef, { walletBalance: newBalance });
+
+                    // 3. Create the order document with the purchased keys
                     const orderData = { 
-                        userId: currentUserData.uid, orderId, phoneNumber,
+                        userId: currentUserData.uid,
+                        orderId,
                         items: items.map(p => ({ 
                             id: p.id, 
                             name: `${p.name} (${p.selectedVariant.name})`, 
                             price: p.selectedVariant.price, 
-                            quantity: p.quantity 
+                            quantity: p.quantity,
+                            keys: purchasedKeysByProduct[p.id] || [] // Add the keys to the order item
                         })), 
-                        subtotal, discount: discountAmount, coupon: (appliedCoupon && isFromCart) ? appliedCoupon.code : null, 
-                        total: totalCost, createdAt: serverTimestamp() 
+                        subtotal, 
+                        discount: discountAmount, 
+                        coupon: (appliedCoupon && isFromCart) ? appliedCoupon.code : null, 
+                        total: totalCost, 
+                        createdAt: serverTimestamp() 
                     };
-                    transaction.set(doc(collection(db, 'orders')), orderData);
+                    transaction.set(doc(db, 'orders', orderId), orderData);
+
+                    // 4. Log the wallet transaction
                     transaction.set(doc(collection(db, 'walletTransactions')), {
                         userId: currentUserData.uid, type: 'debit', amount: totalCost,
-                        description: `Order ${orderId}`, createdAt: serverTimestamp()
+                        description: `Order #${orderId.substring(0,6)}`, createdAt: serverTimestamp()
                     });
                 });
 
-                showToast("Purchase successful! Redirecting...", false, 4000);
+                showToast("Purchase successful! Your keys are in 'My Orders'.", false);
                 
                 if (isFromCart) {
                     cart = [];
                     appliedCoupon = null;
                 }
                 updateCart();
-                
-                const message = encodeURIComponent(`Hello, I've just placed an order on DIGITAL SHOP.\n\n*Order ID:* ${orderId}\n*Total:* ₹${totalCost.toFixed(2)}\n\nPlease confirm my order.`);
-                setTimeout(() => { window.open(`https://wa.me/917597992445?text=${message}`, '_blank'); }, 1000);
+                fetchAndShowOrders(); // Refresh orders
+                openModal(document.getElementById('orders-modal'));
 
             } catch(error) { 
                 console.error("Purchase error: ", error); 
@@ -676,6 +710,16 @@
             setTimeout(() => toast.classList.remove('show'), duration);
         }
 
+        function copyToClipboard(text) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            showToast('Key copied to clipboard!');
+        }
+
         function handleFilterClick(e) {
             document.querySelectorAll('.product-filter-btn').forEach(btn => btn.classList.remove('active-filter'));
             e.target.classList.add('active-filter');
@@ -705,7 +749,24 @@
                 } else {
                     container.innerHTML = orders.map(order => {
                         let dateString = order.createdAt?.toDate().toLocaleDateString() || 'Unknown Date';
-                        return `<div class="border rounded-md p-4 mb-4"><div class="flex justify-between items-center text-sm text-gray-600 mb-2"><span>Order ID: ${order.orderId}</span><span>${dateString}</span></div><div>${order.items.map(item => `<p>${item.quantity} x ${item.name} (₹${item.price})</p>`).join('')}</div><p class="text-right font-bold mt-2">Total: ₹${order.total.toFixed(2)}</p></div>`;
+                        const itemsHtml = order.items.map(item => `
+                            <div class="mt-2 pl-4 border-l-2">
+                                <p>${item.quantity} x ${item.name} (₹${item.price})</p>
+                                ${item.keys && item.keys.length > 0 ? 
+                                    item.keys.map(key => `<p class="text-sm">Your key: <code class="key-code" title="Click to copy">${key}</code></p>`).join('') :
+                                    '<p class="text-sm text-red-500">Key not available. Contact support.</p>'
+                                }
+                            </div>
+                        `).join('');
+
+                        return `<div class="border rounded-md p-4 mb-4">
+                                    <div class="flex justify-between items-center text-sm text-gray-600 mb-2">
+                                        <span>Order #${order.orderId ? order.orderId.substring(0,6) : order.id.substring(0,6)}</span>
+                                        <span>${dateString}</span>
+                                    </div>
+                                    <div>${itemsHtml}</div>
+                                    <p class="text-right font-bold mt-2">Total: ₹${order.total.toFixed(2)}</p>
+                                </div>`;
                     }).join('');
                 }
             } catch (error) {
@@ -973,3 +1034,4 @@
     </script>
 </body>
 </html>
+
