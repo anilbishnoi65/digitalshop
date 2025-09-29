@@ -398,6 +398,8 @@
                     const newBalance = userDoc.data().walletBalance - totalCost;
                     transaction.update(userDocRef, { walletBalance: newBalance });
 
+                    // CHANGE: Save order to user's sub-collection
+                    const orderRef = doc(collection(db, 'users', currentUserData.uid, 'orders'));
                     const orderData = { 
                         userId: currentUserData.uid,
                         orderId,
@@ -414,9 +416,11 @@
                         total: totalCost, 
                         createdAt: serverTimestamp() 
                     };
-                    transaction.set(doc(collection(db, 'orders')), orderData);
+                    transaction.set(orderRef, orderData);
 
-                    transaction.set(doc(collection(db, 'walletTransactions')), {
+                    // CHANGE: Save wallet transaction to user's sub-collection
+                    const walletTxRef = doc(collection(db, 'users', currentUserData.uid, 'walletTransactions'));
+                    transaction.set(walletTxRef, {
                         userId: currentUserData.uid, type: 'debit', amount: totalCost,
                         description: `Order ${orderId}`, createdAt: serverTimestamp()
                     });
@@ -723,7 +727,8 @@
             const container = document.getElementById('orders-container'), loader = document.getElementById('orders-loader'), emptyState = document.getElementById('orders-empty-state');
             loader.classList.remove('hidden'); container.innerHTML = ''; emptyState.classList.add('hidden');
             try {
-                const q = query(collection(db, 'orders'), where("userId", "==", auth.currentUser.uid), orderBy("createdAt", "desc"));
+                // CHANGE: Query the sub-collection
+                const q = query(collection(db, 'users', auth.currentUser.uid, 'orders'), orderBy("createdAt", "desc"));
                 const querySnapshot = await getDocs(q);
                 const orders = querySnapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
                 if (orders.length === 0) {
@@ -749,7 +754,7 @@
                 }
             } catch (error) {
                 console.error("Error fetching orders:", error);
-                container.innerHTML = `<div class="text-center p-4 text-red-600 bg-red-50 rounded-lg"><p class="font-semibold">Could not load order history.</p><p class="text-sm mt-1">This often requires a database index. Check the browser console for a link to create it.</p></div>`;
+                container.innerHTML = `<div class="text-center p-4 text-red-600 bg-red-50 rounded-lg"><p class="font-semibold">Could not load order history.</p><p class="text-sm mt-1">Please try again later.</p></div>`;
             } finally {
                 loader.classList.add('hidden');
             }
@@ -759,7 +764,8 @@
             if (!auth.currentUser) return;
             const container = document.getElementById('wallet-history-container'), loader = document.getElementById('wallet-history-loader'), empty = document.getElementById('wallet-history-empty');
             loader.classList.remove('hidden'); empty.classList.add('hidden'); container.innerHTML = '';
-            const q = query(collection(db, 'walletTransactions'), where('userId', '==', auth.currentUser.uid), orderBy('createdAt', 'desc'));
+            // CHANGE: Query the sub-collection
+            const q = query(collection(db, 'users', auth.currentUser.uid, 'walletTransactions'), orderBy('createdAt', 'desc'));
             const querySnapshot = await getDocs(q);
             const transactions = querySnapshot.docs.map(doc => doc.data());
             loader.classList.add('hidden');
@@ -914,8 +920,6 @@
             `<button type="submit" class="w-full mt-6 bg-indigo-600 text-white py-2 rounded-md hover:bg-indigo-700 font-semibold">Send Reset Link</button>`); 
         }
         
-        function createPurchaseSuccessModalHTML() { return ''; } // No longer used
-
         function createCartModalHTML() { return `<div class="flex items-center justify-center min-h-screen p-4"><div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-lg m-4"><div class="p-6"><div class="flex justify-between items-center mb-6"><h3 class="text-xl font-semibold text-gray-900">Your Cart</h3><button class="close-modal-btn text-gray-400 hover:text-gray-600 text-2xl" data-modal-id="cart-modal">&times;</button></div><div id="cart-items-container" class="max-h-96 overflow-y-auto pr-2 -mr-2"></div><div id="cart-empty-state" class="text-center py-12 hidden"><i class="fas fa-shopping-cart text-4xl text-gray-300 mb-4"></i><p class="text-gray-500">Your cart is empty.</p></div><div id="cart-summary" class="mt-6 border-t pt-4 hidden"><div class="flex items-center gap-2 mb-2"><input id="coupon-code" type="text" placeholder="Coupon Code" class="flex-grow border rounded-md p-2"><button data-action="apply-coupon" class="bg-gray-200 px-4 py-2 rounded-md font-semibold text-sm">Apply</button></div><div id="coupon-feedback"></div><div class="space-y-2 mt-4"><div class="flex justify-between"><span>Subtotal</span><span id="cart-subtotal">₹0.00</span></div><div class="flex justify-between text-sm text-green-600"><span>Discount</span><span id="cart-discount">- ₹0.00</span></div><div class="flex justify-between items-center text-lg font-semibold border-t pt-2 mt-2"><span>Total</span><span id="cart-total">₹0.00</span></div></div><button id="checkout-btn" data-action="checkout" class="w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 mt-4 font-bold disabled:bg-gray-400">Checkout</button></div></div></div></div>`; }
         function createOrdersModalHTML() { return `<div class="flex items-center justify-center min-h-screen p-4"><div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-2xl m-4"><div class="p-6"><div class="flex justify-between items-center mb-6"><h3 class="text-xl font-semibold text-gray-900">My Order History</h3><button class="close-modal-btn text-gray-400 hover:text-gray-600 text-2xl" data-modal-id="orders-modal">&times;</button></div><div id="orders-container" class="max-h-96 overflow-y-auto pr-2"></div><div id="orders-loader" class="text-center py-8 hidden"><i class="fas fa-spinner fa-spin text-2xl text-indigo-600"></i></div><div id="orders-empty-state" class="text-center py-12 hidden"><i class="fas fa-receipt text-4xl text-gray-300 mb-4"></i><p class="text-gray-500">You haven't placed any orders yet.</p></div></div></div></div>`; }
         function createWalletModalHTML() { return `<div class="flex items-center justify-center min-h-screen p-4"><div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-md m-4"><div class="p-6"><div class="flex justify-between items-center mb-4"><h3 class="text-xl font-semibold text-gray-900">My Wallet</h3><button class="close-modal-btn text-gray-400 hover:text-gray-600 text-2xl" data-modal-id="wallet-modal">&times;</button></div><div class="bg-indigo-600 text-white rounded-lg p-6 text-center mb-6"><p class="text-sm opacity-80">Current Balance</p><p id="wallet-modal-balance" class="text-4xl font-bold">₹0.00</p></div><button data-action="add-balance" class="w-full bg-green-500 text-white py-3 rounded-md hover:bg-green-600 font-bold mb-4">Add Balance</button><h4 class="font-semibold mb-2">Transaction History</h4><div id="wallet-history-container" class="max-h-60 overflow-y-auto border rounded-md p-2"></div><div id="wallet-history-loader" class="text-center py-4 hidden"><i class="fas fa-spinner fa-spin text-indigo-600"></i></div><div id="wallet-history-empty" class="text-center py-6 text-gray-500 hidden">No transactions yet.</div></div></div></div>`; }
