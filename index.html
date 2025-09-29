@@ -22,7 +22,7 @@
         .product-filter-btn { padding: 0.5rem 1.5rem; border-radius: 9999px; font-weight: 500; transition: all 0.2s ease-in-out; background-color: #eef2ff; color: #4338ca; }
         .product-filter-btn:hover { background-color: #e0e7ff; }
         .testimonial-card { background: #ffffff; border: 1px solid #e2e8f0; }
-        .modal-open { overflow: hidden; backdrop-filter: blur(5px); }
+        .modal-open { overflow: hidden; }
         /* Styles for selected variant */
         .variant-option input:checked + label { border-color: #4f46e5; background-color: #eef2ff; box-shadow: 0 0 0 2px #c7d2fe; }
         /* Styles for QR code tabs */
@@ -146,15 +146,15 @@
     </footer>
 
     <!-- Modals -->
-    <div id="login-modal" class="modal hidden fixed z-[60] inset-0 bg-gray-600 bg-opacity-75 opacity-0"></div>
-    <div id="signup-modal" class="modal hidden fixed z-[60] inset-0 bg-gray-600 bg-opacity-75 opacity-0"></div>
-    <div id="forgot-password-modal" class="modal hidden fixed z-[60] inset-0 bg-gray-600 bg-opacity-75 opacity-0"></div>
-    <div id="cart-modal" class="modal hidden fixed z-50 inset-0 bg-gray-600 bg-opacity-75 opacity-0"></div>
-    <div id="orders-modal" class="modal hidden fixed z-50 inset-0 bg-gray-600 bg-opacity-75 opacity-0"></div>
-    <div id="wallet-modal" class="modal hidden fixed z-50 inset-0 bg-gray-600 bg-opacity-75 opacity-0"></div>
-    <div id="payment-modal" class="modal hidden fixed z-[60] inset-0 bg-gray-600 bg-opacity-75 opacity-0"></div>
-    <div id="product-detail-modal" class="modal hidden fixed z-50 inset-0 bg-gray-600 bg-opacity-75 opacity-0"></div>
-    <div id="phone-number-modal" class="modal hidden fixed z-[60] inset-0 bg-gray-600 bg-opacity-75 opacity-0"></div>
+    <div id="login-modal" class="modal hidden fixed z-[60] inset-0 bg-gray-600 bg-opacity-75 backdrop-blur-sm opacity-0 overflow-y-auto"></div>
+    <div id="signup-modal" class="modal hidden fixed z-[60] inset-0 bg-gray-600 bg-opacity-75 backdrop-blur-sm opacity-0 overflow-y-auto"></div>
+    <div id="forgot-password-modal" class="modal hidden fixed z-[60] inset-0 bg-gray-600 bg-opacity-75 backdrop-blur-sm opacity-0 overflow-y-auto"></div>
+    <div id="cart-modal" class="modal hidden fixed z-50 inset-0 bg-gray-600 bg-opacity-75 backdrop-blur-sm opacity-0 overflow-y-auto"></div>
+    <div id="orders-modal" class="modal hidden fixed z-50 inset-0 bg-gray-600 bg-opacity-75 backdrop-blur-sm opacity-0 overflow-y-auto"></div>
+    <div id="wallet-modal" class="modal hidden fixed z-50 inset-0 bg-gray-600 bg-opacity-75 backdrop-blur-sm opacity-0 overflow-y-auto"></div>
+    <div id="payment-modal" class="modal hidden fixed z-[60] inset-0 bg-gray-600 bg-opacity-75 backdrop-blur-sm opacity-0 overflow-y-auto"></div>
+    <div id="product-detail-modal" class="modal hidden fixed z-50 inset-0 bg-gray-600 bg-opacity-75 backdrop-blur-sm opacity-0 overflow-y-auto"></div>
+    <div id="phone-number-modal" class="modal hidden fixed z-[60] inset-0 bg-gray-600 bg-opacity-75 backdrop-blur-sm opacity-0 overflow-y-auto"></div>
     <div id="loader-overlay" class="loader-overlay hidden fixed z-[70] inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center opacity-0">
          <i class="fas fa-spinner fa-spin text-5xl text-white"></i>
     </div>
@@ -973,4 +973,3 @@
     </script>
 </body>
 </html>
-
